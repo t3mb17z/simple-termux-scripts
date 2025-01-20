@@ -1,0 +1,124 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+proot_distro="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs"
+
+IFS=
+
+global_option=""
+
+options=("Yes" "No")
+distros=("$(ls "$proot_distro")")
+
+yes_or_not=""
+distro=""
+
+function get_users_list() {
+	local distro="$1"
+	grep -oP "(?<=/home/).+(?=:)" "$proot_distro/$distro/etc/passwd"
+}
+
+function print_opts() {
+	local all_opts=("$@")
+	
+	local valid_index="${all_opts[-1]}"
+	unset 'all_opts[-1]'
+	
+	local optprefix
+	local optsize="${#all_opts[@]}"
+	local suffix=""
+
+	local index=0
+	for opt in "${all_opts[@]}"; do
+		if ((index == valid_index)); then
+			optprefix="\\033[1;36m"
+		else
+			optprefix="\033[0m"
+		fi
+
+		if ((index > -1 && index < optsize - 1)); then
+			suffix="\033[0m / "
+		else
+			suffix=""
+		fi
+		
+		printf "$optprefix%s$suffix" "$opt"
+		index=$((index + 1))
+	done
+}
+
+function show_opts() {
+	local all_opts=("$@")
+	local valid_index="${all_opts[-1]}"
+	unset 'all_opts[-1]'
+	local label="${all_opts[-1]}"
+	unset 'all_opts[-1]'
+	local opts_size=$(("${#all_opts[@]}"))
+	
+	local index
+	local optprefix=""
+	local esc_char
+	esc_char=$(printf "\u1b")
+	local selected
+	printf "\033[0m%s" "$label"
+	print_opts "${all_opts[@]}" "$valid_index"
+	while true; do
+		read -rsn1 key
+		if [[ $key == "$esc_char" ]]; then
+			read -rsn2 key
+		fi
+		case $key in
+			'[D')
+				if ((valid_index < opts_size && valid_index > -1)); then
+					valid_index=$((valid_index - 1))
+				fi
+				;;
+			'[C')
+				if ((valid_index > -1 && valid_index < opts_size)); then
+					valid_index=$((valid_index + 1))
+				fi
+				;;
+			"")
+				break
+				;;
+		esac
+		if ((valid_index < 0)); then
+			valid_index=$((opts_size - 1))
+		elif ((valid_index > opts_size - 1)); then
+			valid_index=0
+		fi
+		printf "\r\033[0m%s" "$label"
+		print_opts "${all_opts[@]}" "$valid_index"
+	done
+	selected="${all_opts[$valid_index]}"
+	global_option="$selected"
+}
+
+NOAN="\033[0m"
+
+printf "\033[0m"
+
+show_opts "${options[@]}" "Start on proot-distro?: " 0
+yes_or_not="$global_option"
+if [[ $yes_or_not == "No" ]]; then
+	echo
+	return
+fi
+printf "${NOAN}\rStart on proot-distro?: \033[1;36m%s\033[0J\n" "$yes_or_not"
+
+show_opts "${distros[@]}" "Select a distro: " 0
+distro="$global_option"
+printf "${NOAN}\rSelect a distro: \033[1;36m%s\033[0J\n" "$distro"
+
+users_list=("$(get_users_list "$distro")")
+users_list+=("root")
+show_opts "${users_list[@]}" "Select a user: " 0
+user="$global_option"
+printf "${NOAN}\rSelect a user: \033[1;36m%s\033[0J\n${NOAN}" "$user"
+
+comm="proot-distro login "
+comm+="$distro "
+if [[ $user != "root" ]]; then
+	comm+=" --user $user"
+fi
+
+eval "$comm"
