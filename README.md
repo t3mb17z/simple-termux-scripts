@@ -1,6 +1,8 @@
 # simple-termux-bash-scripts
 A simple repo with curious Termux bash scripts
 
+Get the script (just copy and paste on terminal)
+
 ```sh
 wget -qO- https://raw.githubusercontent.com/C1ENC14SOD4/simple-termux-bash-scripts/refs/heads/main/proot > ./proot
 ```
