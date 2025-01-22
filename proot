@@ -2,15 +2,41 @@
 
 proot_distro="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs"
 
-IFS=
-
 global_option=""
 
 options=("Yes" "No")
-distros=("$(ls "$proot_distro")")
+distros="$(ls "$proot_distro")"
+IFS=$'\n'
+read -rd '' -a distros <<< "$distros"
 
 yes_or_not=""
 distro=""
+
+IFS=
+
+function pad() {
+	local pos="$1"
+	local string="$2"
+	local pad_with="$3"
+	local until=$4
+
+	local pad_string=""
+	for ((i = 0; i < until; i++)); do
+		pad_string+="$pad_with"
+	done
+
+	local padded_string=""
+
+	case "$pos" in
+		'start')
+			padded_string+="$pad_string$string"
+			;;
+		'end')
+			padded_string+="$string$pad_string"
+	esac
+
+	printf "$padded_string"
+}
 
 function get_users_list() {
 	local distro="$1"
@@ -22,6 +48,8 @@ function print_opts() {
 	
 	local valid_index="${all_opts[-1]}"
 	unset 'all_opts[-1]'
+	local label_size="${all_opts[-1]}"
+	unset 'all_opts[-1]'
 	
 	local optprefix
 	local optsize="${#all_opts[@]}"
@@ -29,30 +57,47 @@ function print_opts() {
 
 	local index=0
 	for opt in "${all_opts[@]}"; do
-		if ((index == valid_index)); then
-			optprefix="\\033[1;36m"
+		if ((index > 0)); then
+			optprefix="$(pad start '' ' ' $label_size)"
 		else
-			optprefix="\033[0m"
+			optprefix=""
+		fi
+
+		if ((index == valid_index)); then
+			optprefix+="\033[1;36m"
+		else
+			optprefix+="\033[0m"
 		fi
 
 		if ((index > -1 && index < optsize - 1)); then
-			suffix="\033[0m / "
+			suffix="\n"
 		else
 			suffix=""
 		fi
-		
+
 		printf "$optprefix%s$suffix" "$opt"
 		index=$((index + 1))
 	done
 }
 
+function lines_to_up() {
+	local lines="$1"
+	if ((lines == 0)); then
+		printf "\r"
+	else
+		printf "\033[%sA\r" "$lines"
+	fi
+}
+
 function show_opts() {
+	NOAN="\033[0m"
 	local all_opts=("$@")
-	local valid_index="${all_opts[-1]}"
+	local valid_index=${all_opts[-1]}
 	unset 'all_opts[-1]'
 	local label="${all_opts[-1]}"
 	unset 'all_opts[-1]'
-	local opts_size=$(("${#all_opts[@]}"))
+	local opts_size=${#all_opts[@]}
+	local lines_up=$((${#all_opts[@]} - 1))
 	
 	local index
 	local optprefix=""
@@ -60,19 +105,20 @@ function show_opts() {
 	esc_char=$(printf "\u1b")
 	local selected
 	printf "\033[0m%s" "$label"
-	print_opts "${all_opts[@]}" "$valid_index"
+	print_opts "${all_opts[@]}" ${#label} $valid_index
+	lines_to_up "$lines_up"
 	while true; do
 		read -rsn1 key
 		if [[ $key == "$esc_char" ]]; then
 			read -rsn2 key
 		fi
 		case $key in
-			'[D')
+			'[A')
 				if ((valid_index < opts_size && valid_index > -1)); then
 					valid_index=$((valid_index - 1))
 				fi
 				;;
-			'[C')
+			'[B')
 				if ((valid_index > -1 && valid_index < opts_size)); then
 					valid_index=$((valid_index + 1))
 				fi
@@ -87,33 +133,35 @@ function show_opts() {
 			valid_index=0
 		fi
 		printf "\r\033[0m%s" "$label"
-		print_opts "${all_opts[@]}" "$valid_index"
+		print_opts "${all_opts[@]}" ${#label} $valid_index
+		lines_to_up "$lines_up"
 	done
 	selected="${all_opts[$valid_index]}"
 	global_option="$selected"
+	printf "${NOAN}\r%s\033[1;36m%s\033[0J\n" "$label" "$selected"
 }
-
-NOAN="\033[0m"
-
-printf "\033[0m"
 
 show_opts "${options[@]}" "Start on proot-distro?: " 0
 yes_or_not="$global_option"
 if [[ $yes_or_not == "No" ]]; then
-	echo
 	return
 fi
-printf "${NOAN}\rStart on proot-distro?: \033[1;36m%s\033[0J\n" "$yes_or_not"
 
 show_opts "${distros[@]}" "Select a distro: " 0
 distro="$global_option"
-printf "${NOAN}\rSelect a distro: \033[1;36m%s\033[0J\n" "$distro"
 
 users_list=("$(get_users_list "$distro")")
 users_list+=("root")
+
+if [[ "${users_list[0]}" == "" ]]; then
+	unset 'users_list[0]'
+fi
+
 show_opts "${users_list[@]}" "Select a user: " 0
 user="$global_option"
-printf "${NOAN}\rSelect a user: \033[1;36m%s\033[0J\n${NOAN}" "$user"
+
+show_opts "${options[@]}" "Exit instantly when log out?: " 0
+exit_now="$global_option"
 
 comm="proot-distro login "
 comm+="$distro "
@@ -122,3 +170,9 @@ if [[ $user != "root" ]]; then
 fi
 
 eval "$comm"
+
+if [[ "$exit_now" == "Yes" ]]; then
+	exit 0
+else
+	return
+fi
