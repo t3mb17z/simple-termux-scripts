@@ -33,6 +33,7 @@ function pad() {
 			;;
 		'end')
 			padded_string+="$string$pad_string"
+			;;
 	esac
 
 	printf "$padded_string"
@@ -51,22 +52,22 @@ function print_opts() {
 	local label_size="${all_opts[-1]}"
 	unset 'all_opts[-1]'
 	
-	local optprefix
+	local optprefix="\033[0m"
 	local optsize="${#all_opts[@]}"
 	local suffix=""
 
 	local index=0
 	for opt in "${all_opts[@]}"; do
 		if ((index > 0)); then
-			optprefix="$(pad start '' ' ' $label_size)"
+			optprefix+="$(pad start '' ' ' $label_size)"
 		else
-			optprefix=""
+			optprefix+=""
 		fi
 
 		if ((index == valid_index)); then
-			optprefix+="\033[1;36m"
+			optprefix+="\033[38;5;15m"
 		else
-			optprefix+="\033[0m"
+			optprefix+="\033[38;5;8m"
 		fi
 
 		if ((index > -1 && index < optsize - 1)); then
@@ -92,12 +93,15 @@ function lines_to_up() {
 function show_opts() {
 	NOAN="\033[0m"
 	local all_opts=("$@")
-	local valid_index=${all_opts[-1]}
-	unset 'all_opts[-1]'
+
+	local valid_index=0
+
 	local label="${all_opts[-1]}"
 	unset 'all_opts[-1]'
 	local opts_size=${#all_opts[@]}
 	local lines_up=$((${#all_opts[@]} - 1))
+	local label_real="$(echo -e "$label" | sed "s/$(echo -e "\033")[^m]*m//g")"
+	local label_real_length=${#label_real}
 	
 	local index
 	local optprefix=""
@@ -105,7 +109,7 @@ function show_opts() {
 	esc_char=$(printf "\u1b")
 	local selected
 	printf "\033[0m%s" "$label"
-	print_opts "${all_opts[@]}" ${#label} $valid_index
+	print_opts "${all_opts[@]}" $label_real_length $valid_index
 	lines_to_up "$lines_up"
 	while true; do
 		read -rsn1 key
@@ -133,7 +137,7 @@ function show_opts() {
 			valid_index=0
 		fi
 		printf "\r\033[0m%s" "$label"
-		print_opts "${all_opts[@]}" ${#label} $valid_index
+		print_opts "${all_opts[@]}" $label_real_length $valid_index
 		lines_to_up "$lines_up"
 	done
 	selected="${all_opts[$valid_index]}"
@@ -141,13 +145,15 @@ function show_opts() {
 	printf "${NOAN}\r%s\033[1;36m%s\033[0J\n" "$label" "$selected"
 }
 
-show_opts "${options[@]}" "Start on proot-distro?: " 0
+prompt=$' \033[32m>\033[1;37m '
+
+show_opts "${options[@]}" "${prompt}Start on proot-distro?: "
 yes_or_not="$global_option"
 if [[ $yes_or_not == "No" ]]; then
 	return
 fi
 
-show_opts "${distros[@]}" "Select a distro: " 0
+show_opts "${distros[@]}" "${prompt}Select a distro: "
 distro="$global_option"
 
 users_list=("$(get_users_list "$distro")")
@@ -157,10 +163,10 @@ if [[ "${users_list[0]}" == "" ]]; then
 	unset 'users_list[0]'
 fi
 
-show_opts "${users_list[@]}" "Select a user: " 0
+show_opts "${users_list[@]}" "${prompt}Select a user: "
 user="$global_option"
 
-show_opts "${options[@]}" "Exit instantly when log out?: " 0
+show_opts "${options[@]}" "${prompt}Exit instantly when log out?: "
 exit_now="$global_option"
 
 comm="proot-distro login "
