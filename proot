@@ -36,7 +36,7 @@ function pad() {
 			;;
 	esac
 
-	printf "$padded_string"
+	printf "%s" "$padded_string"
 }
 
 function get_users_list() {
@@ -49,31 +49,31 @@ function print_opts() {
 	
 	local valid_index="${all_opts[-1]}"
 	unset 'all_opts[-1]'
-	local label_size="${all_opts[-1]}"
+	local label_size=$((${all_opts[-1]}))
 	unset 'all_opts[-1]'
 	
 	local optprefix="\033[0m"
 	local optsize="${#all_opts[@]}"
-	local suffix=""
+	local suffix
 
 	local index=0
 	for opt in "${all_opts[@]}"; do
 		if ((index > 0)); then
 			optprefix+="$(pad start '' ' ' $label_size)"
-		else
-			optprefix+=""
 		fi
 
 		if ((index == valid_index)); then
-			optprefix+="\033[38;5;15m"
+			optprefix+="\033[1m\033[38;5;51m"
+			suffix=" <"
 		else
-			optprefix+="\033[38;5;8m"
+			optprefix+="\033[22m\033[38;5;15m"
+			suffix="\033[0K"
 		fi
 
 		if ((index > -1 && index < optsize - 1)); then
-			suffix="\n"
+			suffix+="\n"
 		else
-			suffix=""
+			suffix+=""
 		fi
 
 		printf "$optprefix%s$suffix" "$opt"
@@ -100,8 +100,9 @@ function show_opts() {
 	unset 'all_opts[-1]'
 	local opts_size=${#all_opts[@]}
 	local lines_up=$((${#all_opts[@]} - 1))
-	local label_real="$(echo -e "$label" | sed "s/$(echo -e "\033")[^m]*m//g")"
-	local label_real_length=${#label_real}
+	local label_real
+	label_real="$(echo -e "$label" | sed "s/$(echo -e "\033")[^m]*m//g")"
+	local label_real_length=$((${#label_real}))
 	
 	local index
 	local optprefix=""
@@ -142,7 +143,7 @@ function show_opts() {
 	done
 	selected="${all_opts[$valid_index]}"
 	global_option="$selected"
-	printf "${NOAN}\r%s\033[1;36m%s\033[0J\n" "$label" "$selected"
+	printf "${NOAN}\r%s\033[38;5;15m%s\033[0J\n" "$label" "$selected"
 }
 
 prompt=$' \033[32m>\033[1;37m '
