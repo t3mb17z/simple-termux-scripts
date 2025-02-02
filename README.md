@@ -13,5 +13,5 @@ Give it execution permissions and setup at Termux start up
 chmod +x ./proot
 mkdir -p $HOME/.termux/start/
 mv ./proot $HOME/.termux/start/proot
-echo 'source "$HOME/.termux/start/proot" >> $HOME/.bashrc'
+echo 'source "$HOME/.termux/start/proot"' >> $HOME/.bashrc
 ```
