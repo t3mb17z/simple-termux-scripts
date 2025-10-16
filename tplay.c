@@ -1,18 +1,21 @@
+#if defined(_WIN32)
 #define SDL_MAIN_HANDLED
+#endif
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
 #include <ncurses/ncurses.h>
 
-#ifdef __linux__
+#if defined(__linux__)
 #include <sys/ioctl.h>
-#elif _WIN32
+#elif defined(_WIN32)
 #include <windows.h>
 #endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 int main(int argc, char *argv[]) {
 
@@ -51,7 +54,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-#ifdef __linux__
+#if defined(__linux__)
 
   struct winsize ws;
 
@@ -79,7 +82,11 @@ int main(int argc, char *argv[]) {
   nodelay(stdscr, TRUE);
 
   double duration = Mix_MusicDuration(music);
-  const char *name = Mix_GetMusicTitleTag(music);
+  float dur_minutes = floor(duration / 60.0f);
+  float dur_seconds = floor(fmodf(duration, 60.0f));
+  const char *title = Mix_GetMusicTitleTag(music);
+  const char *artist = Mix_GetMusicArtistTag(music);
+  const char *album = Mix_GetMusicAlbumTag(music);
   int is_paused = 0, showing_info = 0;
   WINDOW *info, *out_box;
   int chr = 0, showingInfo = 0;
@@ -89,12 +96,12 @@ int main(int argc, char *argv[]) {
       chr = getch();
       if(chr == 'i') {
         float height, width, x, y;
-#ifdef __linux__
-        width = ws.ws_col / 10.0f * 6.0f;
-        height = ws.ws_row / 10.0f * 3.0f;
+#if defined(__linux__)
+        width = ws.ws_col / 10.0f * 8.0f;
+        height = ws.ws_row / 10.0f * 5.0f;
         x = (float)ws.ws_col / 2 - width / 2;
         y = (float)ws.ws_row / 2 - height / 2;
-#elif _WIN32
+#elif defined(_WIN32)
         width = columns / 10.0f * 6.0f;
         height = rows / 10.0f * 3.0f;
         x = (float)columns / 2 - width / 2;
@@ -116,7 +123,7 @@ int main(int argc, char *argv[]) {
 
     if(showingInfo){
       chr = wgetch(info);
-      if(chr == 'o') {
+      if(chr == 'i') {
         wclear(info);
         wclear(out_box);
         wrefresh(info);
@@ -128,9 +135,16 @@ int main(int argc, char *argv[]) {
         showingInfo = 0;
       } else {
         double position = Mix_GetMusicPosition(music);
-        mvwprintw(info, 0, 0, "Name: %s", name);
-        mvwprintw(info, 1, 0, "Time: %f / %f", position, duration);
-        mvwprintw(info, 2, 0, "Loaded from: %s", filename);
+        float minutes = floor(position / 60);
+        float seconds = floor(fmodf(position, 60));
+        mvwprintw(info, 0, 0, "Title: %s", title);
+        mvwprintw(info, 1, 0, "Artist: %s", artist);
+        mvwprintw(info, 2, 0, "Album: %s", album);
+        mvwprintw(info, 3, 0, "Time: %02d:%02d / %02d:%02d",
+          (int)minutes, (int)seconds,
+          (int)dur_minutes, (int)dur_seconds
+        );
+        mvwprintw(info, 4, 0, "Loaded from: %s", filename);
         wrefresh(info);
       }
     }
