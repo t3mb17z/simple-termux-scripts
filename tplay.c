@@ -2,6 +2,8 @@
 #define SDL_MAIN_HANDLED
 #endif
 
+#define NCURSES_WIDECHAR 1
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
 #include <ncurses/ncurses.h>
@@ -81,6 +83,14 @@ int main(int argc, char *argv[]) {
   cbreak();
   nodelay(stdscr, TRUE);
 
+  cchar_t vb, hb, tlc, trc, blc, brc;
+  setcchar(&vb, L"\u2502", 0, 0, NULL);
+  setcchar(&hb, L"\u2500", 0, 0, NULL);
+  setcchar(&tlc, L"\u256d", 0, 0, NULL);
+  setcchar(&trc, L"\u256e", 0, 0, NULL);
+  setcchar(&blc, L"\u256f", 0, 0, NULL);
+  setcchar(&brc, L"\u2570", 0, 0, NULL);
+
   double duration = Mix_MusicDuration(music);
   float dur_minutes = floor(duration / 60.0f);
   float dur_seconds = floor(fmodf(duration, 60.0f));
@@ -111,13 +121,10 @@ int main(int argc, char *argv[]) {
         nodelay(info, TRUE);
         nodelay(stdscr, FALSE);
         out_box = newwin(height + 2, width + 2, y - 1, x - 1);
-        box(out_box, 0, 0);
+        wborder_set(out_box, &vb, &vb, &hb, &hb, &tlc, &trc, &brc, &blc);
         wrefresh(out_box);
         wrefresh(info);
         showingInfo = 1;
-      } else if(chr == 'q') {
-        break;
-        goto end;
       }
     }
 
@@ -147,6 +154,14 @@ int main(int argc, char *argv[]) {
         mvwprintw(info, 4, 0, "Loaded from: %s", filename);
         wrefresh(info);
       }
+    }
+    if(chr == 'q') {
+      break;
+      goto end;
+    } else if(chr == 'p') {
+      if(is_paused) Mix_ResumeMusic();
+      else Mix_PauseMusic();
+      is_paused = !is_paused;
     }
   }
 
