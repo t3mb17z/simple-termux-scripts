@@ -1,3 +1,4 @@
+#include <locale.h>
 #if defined(_WIN32)
 #define SDL_MAIN_HANDLED
 #endif
@@ -19,7 +20,14 @@
 #include <string.h>
 #include <math.h>
 
+const wchar_t *blocksProg[] = {
+  L"\u2588", L"\u2589", L"\u258a", L"\u258b",
+  L"\u258c", L"\u258d", L"\u258e", L"\u258f"
+};
+
 int main(int argc, char *argv[]) {
+
+  setlocale(LC_ALL, "");
 
   if(argc < 2) {
     fprintf(stderr, "Not argument provided\n");
@@ -83,6 +91,17 @@ int main(int argc, char *argv[]) {
   cbreak();
   nodelay(stdscr, TRUE);
 
+  if(can_change_color()) printf("Can change");
+  else {
+    printf("Can't change");
+    endwin();
+    return 0;
+  }
+
+  start_color();
+  init_color(8, 777, 777, 777);
+  init_pair(1, COLOR_WHITE, 8);
+
   cchar_t vb, hb, tlc, trc, blc, brc;
   setcchar(&vb, L"\u2502", 0, 0, NULL);
   setcchar(&hb, L"\u2500", 0, 0, NULL);
@@ -97,26 +116,32 @@ int main(int argc, char *argv[]) {
   const char *title = Mix_GetMusicTitleTag(music);
   const char *artist = Mix_GetMusicArtistTag(music);
   const char *album = Mix_GetMusicAlbumTag(music);
+
   int is_paused = 0, showing_info = 0;
   WINDOW *info, *out_box;
   int chr = 0, showingInfo = 0;
+  float height, width, x, y;
+
+#if defined(__linux__)
+  width = ws.ws_col / 10.0f * 8.0f;
+  height = ws.ws_row / 10.0f * 5.0f;
+  x = (float)ws.ws_col / 2 - width / 2;
+  y = (float)ws.ws_row / 2 - height / 2;
+#elif defined(_WIN32)
+  width = columns / 10.0f * 6.0f;
+  height = rows / 10.0f * 3.0f;
+  x = (float)columns / 2 - width / 2;
+  y = (float)rows / 2 - height / 2;
+#endif
+
+  char *incomplete = calloc(width + 1, 1);
+  wchar_t *progress = calloc(width + 1, 1);
+  float filledBlocks = 0, blocks = (width / duration);
 
   while(Mix_PlayingMusic()) {
     if(!showingInfo) {
       chr = getch();
       if(chr == 'i') {
-        float height, width, x, y;
-#if defined(__linux__)
-        width = ws.ws_col / 10.0f * 8.0f;
-        height = ws.ws_row / 10.0f * 5.0f;
-        x = (float)ws.ws_col / 2 - width / 2;
-        y = (float)ws.ws_row / 2 - height / 2;
-#elif defined(_WIN32)
-        width = columns / 10.0f * 6.0f;
-        height = rows / 10.0f * 3.0f;
-        x = (float)columns / 2 - width / 2;
-        y = (float)rows / 2 - height / 2;
-#endif
         info = newwin(height, width, y, x);
         nodelay(info, TRUE);
         nodelay(stdscr, FALSE);
@@ -144,21 +169,36 @@ int main(int argc, char *argv[]) {
         double position = Mix_GetMusicPosition(music);
         float minutes = floor(position / 60);
         float seconds = floor(fmodf(position, 60));
-        mvwprintw(info, 0, 0, "Title: %s", title);
+        float percentage = (position / duration) * 100;
+        filledBlocks = blocks * position;
+        if(is_paused) mvwprintw(info, height - 3, width - 6, "Paused");
+        else {
+          wmove(info, height - 3, width - 6);
+          wclrtoeol(info);
+        }
+        mvwprintw(info, 0, 0, "Title: %s, %lc", title, L'\u2589');
         mvwprintw(info, 1, 0, "Artist: %s", artist);
-        mvwprintw(info, 2, 0, "Album: %s", album);
-        mvwprintw(info, 3, 0, "Time: %02d:%02d / %02d:%02d",
+        mvwprintw(info, 2, 0, "Album: %s, width: %f, filled blocks: %f", album, width, filledBlocks);
+        mvwprintw(info, 3, 0, "Time: %02d:%02d / %02d:%02d (%.2f%%)",
           (int)minutes, (int)seconds,
-          (int)dur_minutes, (int)dur_seconds
+          (int)dur_minutes, (int)dur_seconds, percentage
         );
         mvwprintw(info, 4, 0, "Loaded from: %s", filename);
+        for(int i = 0; i < (int)roundf(filledBlocks + 1); i++) {
+          wcsncat(progress, blocksProg[0], 1);
+        }
+        wattron(info, COLOR_PAIR(1));
+        mvwprintw(info, height - 1, 0, "%ls", progress);
+        wattroff(info, COLOR_PAIR(1));
         wrefresh(info);
       }
+      memset(progress, 0, width);
     }
+
     if(chr == 'q') {
       break;
       goto end;
-    } else if(chr == 'p') {
+    } else if(chr == 0x20) {
       if(is_paused) Mix_ResumeMusic();
       else Mix_PauseMusic();
       is_paused = !is_paused;
