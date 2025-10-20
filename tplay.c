@@ -7,7 +7,7 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
-#include <ncurses/ncurses.h>
+#include <ncursesw/curses.h>
 
 #if defined(__linux__)
 #include <sys/ioctl.h>
@@ -20,14 +20,16 @@
 #include <string.h>
 #include <math.h>
 
-const wchar_t *blocksProg[] = {
-  L"\u2588", L"\u2589", L"\u258a", L"\u258b",
-  L"\u258c", L"\u258d", L"\u258e", L"\u258f"
+const wchar_t blocksProg[] = {
+  L"\u258f" "\u258e" "\u258d" "\u258c"
+  "\u258b" "\u258a" "\u2589" "\u2588"
 };
 
 int main(int argc, char *argv[]) {
 
   setlocale(LC_ALL, "");
+
+  SetConsoleOutputCP(CP_UTF8);
 
   if(argc < 2) {
     fprintf(stderr, "Not argument provided\n");
@@ -91,15 +93,15 @@ int main(int argc, char *argv[]) {
   cbreak();
   nodelay(stdscr, TRUE);
 
-  if(can_change_color()) printf("Can change");
-  else {
-    printf("Can't change");
-    endwin();
-    return 0;
-  }
+  // if(can_change_color()) printf("Can change");
+  // else {
+  //   printf("Can't change");
+  //   endwin();
+  //   return 0;
+  // }
 
   start_color();
-  init_color(8, 777, 777, 777);
+  init_color(8, 333, 333, 333);
   init_pair(1, COLOR_WHITE, 8);
 
   cchar_t vb, hb, tlc, trc, blc, brc;
@@ -135,7 +137,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   char *incomplete = calloc(width + 1, 1);
-  wchar_t *progress = calloc(width + 1, 1);
+  wchar_t *progress = calloc(width + 1, sizeof(unsigned short));
   float filledBlocks = 0, blocks = (width / duration);
 
   while(Mix_PlayingMusic()) {
@@ -171,12 +173,12 @@ int main(int argc, char *argv[]) {
         float seconds = floor(fmodf(position, 60));
         float percentage = (position / duration) * 100;
         filledBlocks = blocks * position;
-        if(is_paused) mvwprintw(info, height - 3, width - 6, "Paused");
+        if(is_paused) mvwaddstr(info, height - 3, width - 6, "Paused");
         else {
           wmove(info, height - 3, width - 6);
           wclrtoeol(info);
         }
-        mvwprintw(info, 0, 0, "Title: %s, %lc", title, L'\u2589');
+        mvwprintw(info, 0, 0, "Title: %s", title);
         mvwprintw(info, 1, 0, "Artist: %s", artist);
         mvwprintw(info, 2, 0, "Album: %s, width: %f, filled blocks: %f", album, width, filledBlocks);
         mvwprintw(info, 3, 0, "Time: %02d:%02d / %02d:%02d (%.2f%%)",
@@ -184,15 +186,20 @@ int main(int argc, char *argv[]) {
           (int)dur_minutes, (int)dur_seconds, percentage
         );
         mvwprintw(info, 4, 0, "Loaded from: %s", filename);
-        for(int i = 0; i < (int)roundf(filledBlocks + 1); i++) {
-          wcsncat(progress, blocksProg[0], 1);
+        size_t len = wcslen(progress);
+        for(int i = 0; i < (int)floorf(filledBlocks + 1); i++) {
+          progress[len] = blocksProg[7];
+          progress[++len] = 0;
         }
+        int which = (int)roundf(fmodf(filledBlocks, 1) / 0.125f);
+        progress[len] = blocksProg[which - 1];
         wattron(info, COLOR_PAIR(1));
-        mvwprintw(info, height - 1, 0, "%ls", progress);
+        mvwaddwstr(info, height - 1, 0, progress);
         wattroff(info, COLOR_PAIR(1));
+        wmove(info, 0, 0);
         wrefresh(info);
       }
-      memset(progress, 0, width);
+      memset(progress, 0, (width + 1) * sizeof(unsigned short));
     }
 
     if(chr == 'q') {
