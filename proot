@@ -1,5 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
+if ! command -v proot-distro
+then
+  printf "No 'proot-distro' command\n"
+  exit 0
+fi
+
 proot_distro="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs"
 
 global_option=""
@@ -151,7 +157,7 @@ prompt=$' \033[32m>\033[1;37m '
 show_opts "${options[@]}" "${prompt}Start on proot-distro?: "
 yes_or_not="$global_option"
 if [[ $yes_or_not == "No" ]]; then
-	return
+	exit 0
 fi
 
 show_opts "${distros[@]}" "${prompt}Select a distro: "
