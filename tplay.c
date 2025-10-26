@@ -30,6 +30,10 @@ int main(int argc, char *argv[]) {
 
   setlocale(LC_ALL, "");
 
+  int debInd = 0;
+  wchar_t *debug = calloc(1024, sizeof(wchar_t));
+  debug[0] = 0;
+
 #ifdef _WIN32
   SetConsoleOutputCP(CP_UTF8);
 #endif
@@ -96,6 +100,7 @@ int main(int argc, char *argv[]) {
   initscr();
   noecho();
   cbreak();
+  keypad(stdscr, TRUE);
   nodelay(stdscr, TRUE);
 
   // if(can_change_color()) printf("Can change");
@@ -146,11 +151,16 @@ int main(int argc, char *argv[]) {
   float filledBlocks = 0, blocks = (width / duration);
 
   while(Mix_PlayingMusic()) {
+    move(0, 0);
+    clrtoeol();
+    printw("%d", debug[debInd - 1]);
+    refresh();
     if(!showingInfo) {
       chr = getch();
       if(chr == 'i') {
         info = newwin(height, width, y, x);
         nodelay(info, TRUE);
+        keypad(info, TRUE);
         nodelay(stdscr, FALSE);
         out_box = newwin(height + 2, width + 2, y - 1, x - 1);
         wborder_set(out_box, &vb, &vb, &hb, &hb, &tlc, &trc, &brc, &blc);
@@ -211,20 +221,23 @@ int main(int argc, char *argv[]) {
       memset(incomplete, 0, (width + 1) * sizeof(char));
     }
 
-    free(progress);
-    free(incomplete);
-    progress = NULL;
-    incomplete = NULL;
-
-    if(chr == 'q') {
-      break;
+    if(chr == 'q' || chr == 3) {
       goto end;
     } else if(chr == 0x20) {
       if(is_paused) Mix_ResumeMusic();
       else Mix_PauseMusic();
       is_paused = !is_paused;
+    } else if(chr >= 48 && chr <= 57) {
+      Mix_SetMusicPosition((duration / 10.0f) * (chr - 48));
+    } else {
+      if(chr != ERR) debug[debInd++] = (wchar_t)chr;
     }
   }
+
+  free(progress);
+  free(incomplete);
+  progress = NULL;
+  incomplete = NULL;
 
 end:
   if(showingInfo) {
