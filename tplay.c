@@ -20,6 +20,7 @@
 #include <libgen.h>
 #include <string.h>
 #include <math.h>
+#include <dirent.h>
 
 const wchar_t blocksProg[] = {
   L"\u258f" "\u258e" "\u258d" "\u258c"
@@ -28,18 +29,23 @@ const wchar_t blocksProg[] = {
 
 int main(int argc, char *argv[]) {
 
+  struct dirent **list;
+  int h = scandir("", &list, 0, 0);
+
   setlocale(LC_ALL, "");
 
-  int debInd = 0;
-  wchar_t *debug = calloc(1024, sizeof(wchar_t));
-  debug[0] = 0;
+  char *name = NULL;
+  SDL_AudioSpec spec;
 
 #ifdef _WIN32
   SetConsoleOutputCP(CP_UTF8);
 #endif
 
   if(argc < 2) {
-    fprintf(stderr, "Not argument provided\n");
+    fprintf(stderr,
+        "Not argument provided\n"
+        "Usage: %s <FILE>\n"
+        "File should be an audio file, run \"%s --list-formats # Optinally you can pass only the '-l'\" flag\n", argv[0], argv[0]);
     return 0;
   }
 
@@ -100,6 +106,7 @@ int main(int argc, char *argv[]) {
   initscr();
   noecho();
   cbreak();
+  raw();
   keypad(stdscr, TRUE);
   nodelay(stdscr, TRUE);
 
@@ -109,6 +116,11 @@ int main(int argc, char *argv[]) {
   //   endwin();
   //   return 0;
   // }
+
+  if(SDL_GetDefaultAudioInfo(&name, &spec, 0) == 0) {
+    printw("Audio Output name: %s", name);
+    refresh();
+  }
 
   start_color();
   init_color(8, 333, 333, 333);
@@ -122,7 +134,7 @@ int main(int argc, char *argv[]) {
   setcchar(&blc, L"\u256f", 0, 0, NULL);
   setcchar(&brc, L"\u2570", 0, 0, NULL);
 
-  double duration = Mix_MusicDuration(music);
+  double duration = Mix_MusicDuration(music), position = 0;
   float dur_minutes = floor(duration / 60.0f);
   float dur_seconds = floor(fmodf(duration, 60.0f));
   const char *title = Mix_GetMusicTitleTag(music);
@@ -131,8 +143,9 @@ int main(int argc, char *argv[]) {
 
   int is_paused = 0, showing_info = 0;
   WINDOW *info, *out_box;
-  int chr = 0, showingInfo = 0;
+  int showingInfo = 0;
   float height, width, x, y;
+  wchar_t chr = 0, old = 0;
 
 #if defined(__linux__)
   width = ws.ws_col / 10.0f * 8.0f;
@@ -151,11 +164,19 @@ int main(int argc, char *argv[]) {
   float filledBlocks = 0, blocks = (width / duration);
 
   while(Mix_PlayingMusic()) {
-    move(0, 0);
-    clrtoeol();
-    printw("%d", debug[debInd - 1]);
-    refresh();
+    // move(0, 0);
+    // clrtoeol();
+    // printw("%d", debug[debInd - 1]);
+    // refresh();
     if(!showingInfo) {
+      if(chr != old) {
+        if(chr != ERR) {
+          move(5, 0);
+          clrtoeol();
+          mvprintw(5, 0, "%d", (int)chr);
+          old = chr;
+        }
+      }
       chr = getch();
       if(chr == 'i') {
         info = newwin(height, width, y, x);
@@ -183,7 +204,7 @@ int main(int argc, char *argv[]) {
         refresh();
         showingInfo = 0;
       } else {
-        double position = Mix_GetMusicPosition(music);
+        position = Mix_GetMusicPosition(music);
         float minutes = floor(position / 60);
         float seconds = floor(fmodf(position, 60));
         float percentage = (position / duration) * 100;
@@ -229,9 +250,8 @@ int main(int argc, char *argv[]) {
       is_paused = !is_paused;
     } else if(chr >= 48 && chr <= 57) {
       Mix_SetMusicPosition((duration / 10.0f) * (chr - 48));
-    } else {
-      if(chr != ERR) debug[debInd++] = (wchar_t)chr;
-    }
+    } else if(chr == 104) Mix_SetMusicPosition(--position);
+    else if(chr == 108) Mix_SetMusicPosition(++position);
   }
 
   free(progress);
